@@ -104,9 +104,22 @@ class Cursor:
         self.pack_along_x = True
 
 
+def reverse_presents():
+    presents_filename = os.path.abspath('./data/presents.csv')
+    out_filename = os.path.abspath('./data/presents_revorder.csv')
+    with open(presents_filename, 'rb') as infile:
+        header = infile.readline()
+        lines = infile.readlines()
+        lines.reverse()
+    with open(out_filename, 'wb') as outfile:
+        outfile.write(header)
+        for l in lines:
+            outfile.write(l)
+
+
 if __name__ == "__main__":
     
-    path = 'xxxx'
+    path = 'data'
     reverseOrderedPresentsFilename = os.path.join(path, 'presents_revorder.csv')
     submissionFilename = os.path.join(path, 'sampleSubmission_bottomPacking.csv')
     

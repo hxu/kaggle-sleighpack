@@ -242,9 +242,9 @@ if __name__ == "__main__":
     
     start = time.clock()
     
-    path = 'xxxx'
+    path = 'data'
     presentsFilename = os.path.join(path, 'presents.csv')
-    submissionFilename = os.path.join(path, 'SubmissionFile.csv')
+    submissionFilename = os.path.join(path, 'sampleSubmission_bottomPacking.csv')
 
     # read file contents into solution dictionary and submission dictionary
     solution = readPresentsFile(presentsFilename)
