@@ -16,7 +16,7 @@ def create_header():
     return header
 
 
-def sample_bottom_up(infile='presents_revorder.csv', outfile='sub_bottomup_1.csv', write=True):
+def sample_bottom_up(infile='presents_revorder.csv', outfile='sub_bottomup_1.csv', write=True, check=True):
     """
     Replicate the sample bottom-up approach
     """
@@ -39,7 +39,7 @@ def sample_bottom_up(infile='presents_revorder.csv', outfile='sub_bottomup_1.csv
             # Add the final layer
             sleigh.add_layer(layer)
 
-    if not sleigh.check_all():
+    if check and not sleigh.check_all():
         logger.error('There is an error in the Sleigh')
         return sleigh
 

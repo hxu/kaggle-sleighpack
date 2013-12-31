@@ -63,6 +63,30 @@ class Present(object):
         return self.z1 + self.z - 1
 
     @property
+    def xmax(self):
+        return max(self.x1, self.x2)
+
+    @property
+    def xmin(self):
+        return min(self.x1, self.x2)
+
+    @property
+    def ymax(self):
+        return max(self.y1, self.y2)
+
+    @property
+    def ymin(self):
+        return min(self.y1, self.y2)
+
+    @property
+    def zmax(self):
+        return max(self.z1, self.z2)
+
+    @property
+    def zmin(self):
+        return min(self.z1, self.z2)
+
+    @property
     def dimensions(self):
         return {self.x, self.y, self.z}
 
@@ -137,6 +161,7 @@ class Layer(object):
         self.cursor = LayerCursor()
         # Keys are (x, y, z) coordinates for the Present, values are the Present object
         self.presents = {}
+        self._errors = []
 
     def __repr__(self):
         return "Layer at {}".format(self.z)
@@ -155,7 +180,7 @@ class Layer(object):
             logger.info("Present doesn't fit in row, starting new row")
             # If it exceeds the MAX_X coordinate, reset cursor to new row in layer and re-position the present
             self.cursor.x = 1
-            self.cursor.y = self.max_y
+            self.cursor.y = self.max_y + 1
             present.position = (self.cursor.x, self.cursor.y, self.z)
             x2, y2, z2 = present.opposite_corner
 
@@ -180,10 +205,18 @@ class Layer(object):
         self.cursor.x = self.max_x + 1  # add 1, since coordinates indicate a filled cell in the sleigh
         return True
 
-    def check_for_collisions(self):
-        # Ensure that no presents overlap on the x-y plane
-        for left, right in itertools.combinations(self.presents.values(), 2):
-            pass
+    def check_collisions(self):
+        # Ensure that no presents overlap on the xy plane
+        for p1, p2 in itertools.combinations(self.presents.values(), 2):
+            overlaps = True
+            if (p1.xmax < p2.xmin) or (p2.xmax < p1.xmin):
+                overlaps = False
+            if (p1.ymax < p2.ymin) or (p2.ymax < p1.ymin):
+                overlaps = False
+            if overlaps:
+                self._errors.append('Present {} overlaps with present {}'.format(p1.pid, p2.pid))
+                return False
+        return True
 
 
 class LayerCursor(object):
@@ -235,7 +268,11 @@ class Sleigh(object):
         return True
 
     def check_collisions(self):
-        pass
+        for l in self.layers.values():
+            if not l.check_collisions():
+                self._errors.append('Overlap in layer at z {}'.format(l.z))
+                return False
+        return True
 
     def check_all(self):
         return self.check_count() and self.check_presents() and self.check_collisions()
