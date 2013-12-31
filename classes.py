@@ -18,8 +18,8 @@ class Present(object):
         self.y = int(dim2)  # "Y" without rotation
         self.z = int(dim3)  # "Z" without rotation
 
-    def __unicode__(self):
-        return "Present: {}, {}, {}".format(self.x, self.y, self.z)
+    def __repr__(self):
+        return "Present #{}: {}, {}, {}".format(self.pid, self.x, self.y, self.z)
 
     def get_opposite_corner(self, x1, y1, z1=1):
         x2 = x1 + self.x - 1
@@ -42,14 +42,14 @@ class Present(object):
         """
         x2, y2, z2 = self.get_opposite_corner(x1, y1, z1)
         list_vertices = [
-            [x1, y1, z1],
-            [x1, y2, z1],
-            [x2, y1, z1],
-            [x2, y2, z1],
-            [x1, y1, z2],
-            [x1, y2, z2],
-            [x2, y1, z2],
-            [x2, y2, z2]
+            x1, y1, z1,
+            x1, y2, z1,
+            x2, y1, z1,
+            x2, y2, z1,
+            x1, y1, z2,
+            x1, y2, z2,
+            x2, y1, z2,
+            x2, y2, z2
         ]
         return list_vertices
 
@@ -73,6 +73,9 @@ class Layer(object):
         self.cursor = LayerCursor()
         # Keys are (x, y, z) coordinates for the Present, values are the Present object
         self.presents = {}
+
+    def __repr__(self):
+        return "Layer at {}".format(self.z)
 
     def place_present(self, present):
         """
@@ -130,8 +133,20 @@ class Sleigh(object):
         self.layers = {}
         self.max_z = 1
 
-    def get_new_layer(self):
-        pass
+    def add_layer(self, layer):
+        # Add a layer to the layer hash and update the max_z of the Sleigh
+        self.layers[layer.z] = layer
+        self.max_z = layer.max_z
 
     def score(self):
         pass
+
+    def write(self):
+        """
+        Output the contents of the sleigh into a submission file
+        """
+        for lz, l in self.layers.items():
+            for p_coords, p in l.presents.items():
+                x1, y1 = p_coords
+                vertices = p.get_vertices(x1, y1, lz)
+                yield [p.pid] + vertices
