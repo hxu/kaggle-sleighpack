@@ -1,8 +1,12 @@
 """
 Classes for Sleigh packing problem.
 """
+import csv
+
+
 MAX_X = 1000
 MAX_Y = 1000
+NUM_PRESENTS = 1000000
 import logging
 
 logger = logging.getLogger(__name__)
@@ -20,6 +24,15 @@ class Present(object):
 
     def __repr__(self):
         return "Present #{}: {}, {}, {}".format(self.pid, self.x, self.y, self.z)
+
+    def __eq__(self, other):
+        """
+        Compare if the present has the same id and is of the same size
+        """
+        pass
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
 
     def get_opposite_corner(self, x1, y1, z1=1):
         x2 = x1 + self.x - 1
@@ -52,6 +65,25 @@ class Present(object):
             x2, y2, z2
         ]
         return list_vertices
+
+
+def get_all_presents():
+    """
+    Factory function that returns a dict that contains all presents
+    Keys are IDs, values are Present objects
+    """
+    presents_file = './data/presents.csv'
+    res = {}
+    logger.info('Loading all presents')
+    with open(presents_file, 'rb') as presents:
+        presents.readline() # skip header
+        read = csv.reader(presents)
+        for row in read:
+            present = Present(*row)
+            res[present.pid] = present
+            if len(res) % 100000 == 0:
+                logger.info('Loaded {} Presents'.format(len(res)))
+    return res
 
 
 class Layer(object):
@@ -139,6 +171,14 @@ class Sleigh(object):
         self.max_z = layer.max_z
 
     def score(self):
+        pass
+
+    def check_count(self):
+        # Check that there are a million presents
+        return sum([len(x.presents) for x in self.layers]) == NUM_PRESENTS
+
+    def check_presents(self):
+        # Check that each of the presents is the right dimension
         pass
 
     def write(self):
