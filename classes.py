@@ -2,6 +2,7 @@
 Classes for Sleigh packing problem.
 """
 import csv
+import itertools
 
 
 MAX_X = 1000
@@ -138,7 +139,7 @@ class Layer(object):
 
         # If we can place it, add the Present to the hash
         logger.info("Placing present at {}, {}".format(self.cursor.x, self.cursor.y))
-        self.presents[(self.cursor.x, self.cursor.y)] = present
+        self.presents[(self.cursor.x, self.cursor.y, self.z)] = present
         # Update the max coordinates
         if x2 > self.max_x:
             self.max_x = x2
@@ -170,6 +171,7 @@ class Sleigh(object):
         # Keys are z coordinates of the layer, values are the Layer object
         self.layers = {}
         self.max_z = 1
+        self._errors = []
 
     def add_layer(self, layer):
         # Add a layer to the layer hash and update the max_z of the Sleigh
@@ -181,11 +183,26 @@ class Sleigh(object):
 
     def check_count(self):
         # Check that there are a million presents
-        return sum([len(x.presents) for x in self.layers]) == NUM_PRESENTS
+        return sum([len(x.presents) for x in self.layers.values()]) == NUM_PRESENTS
 
     def check_presents(self):
-        # Check that each of the presents is the right dimension
-        pass
+        all_presents = get_all_presents()
+        sleigh_presents = itertools.chain.from_iterable([x.presents.items() for x in self.layers.values()])
+        for p_coords, p in sleigh_presents:
+            # Check that each of the presents is the right dimension
+            actual_present = all_presents[p.pid]
+            if p != actual_present:
+                self._errors.append('Present {} has dimensions {}, should be {}'.format(p.pid, p.dimensions, actual_present.dimensions))
+                return False
+            # Check that each present is in the sleigh
+            vertices = list(itertools.chain(p_coords[0:2], p.get_opposite_corner(*p_coords)[0:2]))
+            if max(vertices) > MAX_Y or min(vertices) < 1:
+                self._errors.append('Present {} exceeds boundaries of sleigh'.format(p.pid))
+                return False
+        return True
+
+    def check_all(self):
+        return self.check_count() and self.check_presents()
 
     def write(self):
         """
@@ -193,6 +210,6 @@ class Sleigh(object):
         """
         for lz, l in self.layers.items():
             for p_coords, p in l.presents.items():
-                x1, y1 = p_coords
-                vertices = p.get_vertices(x1, y1, lz)
+                x1, y1, z1 = p_coords
+                vertices = p.get_vertices(x1, y1, z1)
                 yield [p.pid] + vertices

@@ -16,14 +16,14 @@ def create_header():
     return header
 
 
-def sample_bottom_up(outfile='sub_bottomup_1.csv'):
+def sample_bottom_up(infile='presents_revorder.csv', outfile='sub_bottomup_1.csv'):
     """
     Replicate the sample bottom-up approach
     """
     sleigh = classes.Sleigh()
     layer = classes.Layer()
 
-    presents_file = './data/presents_revorder.csv'
+    presents_file = os.path.join('data', infile)
     outfile = os.path.join('data', outfile)
     logger.info("Reading and placing presents")
     with open(presents_file, 'rb') as presents:
@@ -36,11 +36,8 @@ def sample_bottom_up(outfile='sub_bottomup_1.csv'):
                     sleigh.add_layer(layer)
                     layer = classes.Layer(z=sleigh.max_z)
                     res = layer.place_present(present)
-                    if not res:
-                        import ipdb; ipdb.set_trace()
 
     logger.info("Writing output file")
-    import ipdb; ipdb.set_trace()
     with open(outfile, 'wb') as out:
         write = csv.writer(out)
         write.writerow(create_header())
