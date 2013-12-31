@@ -17,11 +17,14 @@ class Present(object):
     """
     A Present to be packed in the sleigh
     """
-    def __init__(self, pid, dim1, dim2, dim3):
+    def __init__(self, pid, dim1, dim2, dim3, position=(1, 1, 1)):
         self.pid = int(pid)
         self.x = int(dim1)  # "X" without rotation
         self.y = int(dim2)  # "Y" without rotation
         self.z = int(dim3)  # "Z" without rotation
+        self.x1 = position[0]
+        self.y1 = position[1]
+        self.z1 = position[2]
 
     def __repr__(self):
         return "Present #{}: {}, {}, {}".format(self.pid, self.x, self.y, self.z)
@@ -38,16 +41,37 @@ class Present(object):
         return not self.__eq__(other)
 
     @property
+    def position(self):
+        return self.x1, self.y1, self.z1
+
+    @position.setter
+    def position(self, position):
+        self.x1 = position[0]
+        self.y1 = position[1]
+        self.z1 = position[2]
+
+    @property
+    def x2(self):
+        return self.x1 + self.x - 1
+
+    @property
+    def y2(self):
+        return self.y1 + self.y - 1
+
+    @property
+    def z2(self):
+        return self.z1 + self.z - 1
+
+    @property
     def dimensions(self):
         return {self.x, self.y, self.z}
 
-    def get_opposite_corner(self, x1, y1, z1=1):
-        x2 = x1 + self.x - 1
-        y2 = y1 + self.y - 1
-        z2 = z1 + self.z - 1
-        return x2, y2, z2
+    @property
+    def opposite_corner(self):
+        return self.x2, self.y2, self.z2
 
-    def get_vertices(self, x1, y1, z1):
+    @property
+    def vertices(self):
         """
         Given a starting x, y, and z coordinate, get the eight vertices of the Present
 
@@ -60,7 +84,8 @@ class Present(object):
                            x2 y1 z2
                            x2 y2 z2
         """
-        x2, y2, z2 = self.get_opposite_corner(x1, y1, z1)
+        x1, y1, z1 = self.position
+        x2, y2, z2 = self.opposite_corner
         list_vertices = [
             x1, y1, z1,
             x1, y2, z1,
@@ -123,14 +148,16 @@ class Layer(object):
         - Return False if present doesn't fit on this Layer
         """
         logger.info("Placing present: {}".format(present))
-        x2, y2, z2 = present.get_opposite_corner(self.cursor.x, self.cursor.y, self.z)
+        present.position = (self.cursor.x, self.cursor.y, self.z)
+        x2, y2, z2 = present.opposite_corner
 
         if x2 > MAX_X:
             logger.info("Present doesn't fit in row, starting new row")
             # If it exceeds the MAX_X coordinate, reset cursor to new row in layer and re-position the present
             self.cursor.x = 1
             self.cursor.y = self.max_y
-            x2, y2, z2 = present.get_opposite_corner(self.cursor.x, self.cursor.y, self.z)
+            present.position = (self.cursor.x, self.cursor.y, self.z)
+            x2, y2, z2 = present.opposite_corner
 
         if y2 > MAX_Y:
             # If it exceeds the MAX_Y coordinate, then return False to indicate Present doesn't fit
@@ -139,6 +166,7 @@ class Layer(object):
 
         # If we can place it, add the Present to the hash
         logger.info("Placing present at {}, {}".format(self.cursor.x, self.cursor.y))
+        present.position = (self.cursor.x, self.cursor.y, self.z)
         self.presents[(self.cursor.x, self.cursor.y, self.z)] = present
         # Update the max coordinates
         if x2 > self.max_x:
@@ -149,8 +177,13 @@ class Layer(object):
             self.max_z = z2
 
         # Update the cursor
-        self.cursor.x = self.max_x
+        self.cursor.x = self.max_x + 1  # add 1, since coordinates indicate a filled cell in the sleigh
         return True
+
+    def check_for_collisions(self):
+        # Ensure that no presents overlap on the x-y plane
+        for left, right in itertools.combinations(self.presents.values(), 2):
+            pass
 
 
 class LayerCursor(object):
@@ -187,29 +220,31 @@ class Sleigh(object):
 
     def check_presents(self):
         all_presents = get_all_presents()
-        sleigh_presents = itertools.chain.from_iterable([x.presents.items() for x in self.layers.values()])
-        for p_coords, p in sleigh_presents:
+        sleigh_presents = itertools.chain.from_iterable([x.presents.values() for x in self.layers.values()])
+        for p in sleigh_presents:
             # Check that each of the presents is the right dimension
             actual_present = all_presents[p.pid]
             if p != actual_present:
                 self._errors.append('Present {} has dimensions {}, should be {}'.format(p.pid, p.dimensions, actual_present.dimensions))
                 return False
             # Check that each present is in the sleigh
-            vertices = list(itertools.chain(p_coords[0:2], p.get_opposite_corner(*p_coords)[0:2]))
+            vertices = [p.x1, p.x2, p.y1, p.y2]
             if max(vertices) > MAX_Y or min(vertices) < 1:
                 self._errors.append('Present {} exceeds boundaries of sleigh'.format(p.pid))
                 return False
         return True
 
+    def check_collisions(self):
+        pass
+
     def check_all(self):
-        return self.check_count() and self.check_presents()
+        return self.check_count() and self.check_presents() and self.check_collisions()
 
     def write(self):
         """
         Output the contents of the sleigh into a submission file
         """
         for lz, l in self.layers.items():
-            for p_coords, p in l.presents.items():
-                x1, y1, z1 = p_coords
-                vertices = p.get_vertices(x1, y1, z1)
+            for p in l.presents.values():
+                vertices = p.vertices
                 yield [p.pid] + vertices
