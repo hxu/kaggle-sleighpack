@@ -34,7 +34,7 @@ def sample_bottom_up(infile='presents_revorder.csv', outfile='sub_bottomup_1.csv
                 if not layer.place_present(present):
                     # Can't place the present on the layer, so close the layer and start a new one
                     sleigh.add_layer(layer)
-                    layer = classes.Layer(z=sleigh.max_z)
+                    layer = classes.Layer(z=sleigh.max_z + 1)
                     res = layer.place_present(present)
             # Add the final layer
             sleigh.add_layer(layer)

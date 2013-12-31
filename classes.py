@@ -281,7 +281,8 @@ class Sleigh(object):
         """
         Output the contents of the sleigh into a submission file
         """
-        for lz, l in self.layers.items():
-            for p in l.presents.values():
-                vertices = p.vertices
-                yield [p.pid] + vertices
+        all_presents = itertools.chain.from_iterable(l.presents.values() for l in self.layers.values())
+        all_presents = sorted(all_presents, key=lambda x: x.pid, reverse=True)
+        for p in all_presents:
+            vertices = p.vertices
+            yield [p.pid] + vertices
