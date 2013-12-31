@@ -16,7 +16,7 @@ def create_header():
     return header
 
 
-def sample_bottom_up(infile='presents_revorder.csv', outfile='sub_bottomup_1.csv'):
+def sample_bottom_up(infile='presents_revorder.csv', outfile='sub_bottomup_1.csv', write=True):
     """
     Replicate the sample bottom-up approach
     """
@@ -27,7 +27,7 @@ def sample_bottom_up(infile='presents_revorder.csv', outfile='sub_bottomup_1.csv
     outfile = os.path.join('data', outfile)
     logger.info("Reading and placing presents")
     with open(presents_file, 'rb') as presents:
-            presents.readline() # skip header
+            presents.readline()  # skip header
             read = csv.reader(presents)
             for row in read:
                 present = classes.Present(*row)
@@ -36,13 +36,21 @@ def sample_bottom_up(infile='presents_revorder.csv', outfile='sub_bottomup_1.csv
                     sleigh.add_layer(layer)
                     layer = classes.Layer(z=sleigh.max_z)
                     res = layer.place_present(present)
+            # Add the final layer
+            sleigh.add_layer(layer)
 
-    logger.info("Writing output file")
-    with open(outfile, 'wb') as out:
-        write = csv.writer(out)
-        write.writerow(create_header())
-        for row in sleigh.write():
-            write.writerow(row)
+    if not sleigh.check_all():
+        logger.error('There is an error in the Sleigh')
+        return sleigh
+
+    if write:
+        logger.info("Writing output file")
+        with open(outfile, 'wb') as out:
+            write = csv.writer(out)
+            write.writerow(create_header())
+            for row in sleigh.write():
+                write.writerow(row)
+    return sleigh
 
 
 def sample_top_down():
