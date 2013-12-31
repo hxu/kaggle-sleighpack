@@ -27,12 +27,18 @@ class Present(object):
 
     def __eq__(self, other):
         """
-        Compare if the present has the same id and is of the same size
+        Compare if the present has the same id and is of the same size as other
         """
-        pass
+        if not isinstance(other, Present):
+            raise TypeError("{} is not an instance of Present".format(other))
+        return (self.pid == other.pid) and (self.dimensions == other.dimensions)
 
     def __ne__(self, other):
         return not self.__eq__(other)
+
+    @property
+    def dimensions(self):
+        return {self.x, self.y, self.z}
 
     def get_opposite_corner(self, x1, y1, z1=1):
         x2 = x1 + self.x - 1
