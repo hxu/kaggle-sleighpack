@@ -4,16 +4,10 @@ Packing algorithms
 import csv
 import os
 import classes
+from classes import create_header
 import logging
 
 logger = logging.getLogger(__name__)
-
-
-def create_header():
-    header = ['PresentId']
-    for i in xrange(1,9):
-        header += ['x' + str(i), 'y' + str(i), 'z' + str(i)]
-    return header
 
 
 def sample_bottom_up(infile='presents_revorder.csv', outfile='sub_bottomup_1.csv', write=True, check=True):

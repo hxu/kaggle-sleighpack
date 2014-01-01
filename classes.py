@@ -13,6 +13,13 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def create_header():
+    header = ['PresentId']
+    for i in xrange(1,9):
+        header += ['x' + str(i), 'y' + str(i), 'z' + str(i)]
+    return header
+
+
 class Present(object):
     """
     A Present to be packed in the sleigh
@@ -181,6 +188,8 @@ class Layer(object):
             # If it exceeds the MAX_X coordinate, reset cursor to new row in layer and re-position the present
             self.cursor.x = 1
             self.cursor.y = self.max_y + 1
+            # Also need to reset the maximum x
+            self.max_x = 1
             present.position = (self.cursor.x, self.cursor.y, self.z)
             x2, y2, z2 = present.opposite_corner
 
@@ -227,6 +236,9 @@ class LayerCursor(object):
         self.x = 1
         self.y = 1
 
+    def __repr___(self):
+        return 'Cursor at {}, {}'.format(self.x, self.y)
+
 
 class Sleigh(object):
     """
@@ -238,6 +250,38 @@ class Sleigh(object):
         self.layers = {}
         self.max_z = 1
         self._errors = []
+
+    @staticmethod
+    def load_from_file(filename):
+        """
+        Loads a sleigh from a file
+        """
+        sleigh = Sleigh()
+        count = 0
+        with open(filename, 'rb') as f:
+            fcsv = csv.reader(f)
+            header = fcsv.next()
+            # Check that the header matches
+            if header != create_header():
+                raise RuntimeError('CSV header is not correct: {}'.format(header.join(', ')))
+            for p in fcsv:
+                pid = int(p[0])
+                x1, y1, z1 = map(int, p[1:4])
+                x2, y2, z2 = map(int, p[22:25])
+                x = x2 - x1 + 1
+                y = y2 - y1 + 1
+                z = z2 - z1 + 1
+                # Get the layer that the block belongs to
+                layer = sleigh.layers.get(z1, None)
+                if layer is None:
+                    layer = Layer(z=z1)
+                    sleigh.layers[z1] = layer
+                # Create the present and add it to the layer
+                present = Present(pid, x, y, z, (x1, y1, z1))
+                layer.presents[(x1, y1, z1)] = present
+                count += 1
+        logger.info("Loaded {} presents into sleigh".format(count))
+        return sleigh
 
     def add_layer(self, layer):
         # Add a layer to the layer hash and update the max_z of the Sleigh
@@ -268,10 +312,23 @@ class Sleigh(object):
         return True
 
     def check_collisions(self):
-        for l in self.layers.values():
-            if not l.check_collisions():
-                self._errors.append('Overlap in layer at z {}'.format(l.z))
+        # Check that layers are non-overlapping
+        sorted_layers = sorted(self.layers.values(), key=lambda l: l.z)
+        a, b = itertools.tee(sorted_layers)
+        next(b, None)
+        for l1, l2 in itertools.izip(a, b):
+            if not l1.max_z < l2.z:
+                self._errors.append('Layers at {} and {} overlap'.format(l1.z, l2.z))
                 return False
+            # Check that the boxes in each layer don't overlap
+            if not l2.check_collisions():
+                self._errors.append('Overlap in layer at z {}'.format(l1.z))
+                return False
+            # Need to also be sure to check the first layer
+            if l1.z == 1:
+                if not l1.check_collisions():
+                    self._errors.append('Overlap in layer at z {}'.format(l1.z))
+                    return False
         return True
 
     def check_all(self):
