@@ -244,51 +244,6 @@ class LayerCursor(object):
 
 
 class Sleigh(object):
-    """
-    A Sleigh is a collection of Layers
-    """
-    def __init__(self):
-        # Hash of layers
-        # Keys are z coordinates of the layer, values are the Layer object
-        self.layers = {}
-        self.max_z = 1
-        self._errors = []
-
-    @staticmethod
-    def load_from_file(filename):
-        """
-        Loads a sleigh from a file
-        """
-        sleigh = Sleigh()
-        count = 0
-        with open(filename, 'rb') as f:
-            fcsv = csv.reader(f)
-            header = fcsv.next()
-            # Check that the header matches
-            for p in fcsv:
-                pid = int(p[0])
-                x1, y1, z1 = map(int, p[1:4])
-                x2, y2, z2 = map(int, p[22:25])
-                x = x2 - x1 + 1
-                y = y2 - y1 + 1
-                z = z2 - z1 + 1
-                # Get the layer that the block belongs to
-                layer = sleigh.layers.get(z1, None)
-                if layer is None:
-                    layer = Layer(z=z1)
-                    sleigh.layers[z1] = layer
-                # Create the present and add it to the layer
-                present = Present(pid, x, y, z, (x1, y1, z1))
-                layer.presents[(x1, y1, z1)] = present
-                count += 1
-        logger.info("Loaded {} presents into sleigh".format(count))
-        return sleigh
-
-    def add_layer(self, layer):
-        # Add a layer to the layer hash and update the max_z of the Sleigh
-        self.layers[layer.z] = layer
-        self.max_z = layer.max_z
-
     def score(self):
         # Get a list of the presents from top to bottom
         logger.info("Scoring the Sleigh")
@@ -317,6 +272,53 @@ class Sleigh(object):
         metric = 2 * height_term + order_term
         print '{} = 2 * height term: {} + order term: {}'.format(metric, height_term, order_term)
         return metric
+
+
+class LayerSleigh(Sleigh):
+    """
+    A Sleigh is a collection of Layers
+    """
+    def __init__(self):
+        # Hash of layers
+        # Keys are z coordinates of the layer, values are the Layer object
+        self.layers = {}
+        self.max_z = 1
+        self._errors = []
+
+    @staticmethod
+    def load_from_file(filename):
+        """
+        Loads a sleigh from a file
+        """
+        sleigh = LayerSleigh()
+        count = 0
+        with open(filename, 'rb') as f:
+            fcsv = csv.reader(f)
+            header = fcsv.next()
+            # Check that the header matches
+            for p in fcsv:
+                pid = int(p[0])
+                x1, y1, z1 = map(int, p[1:4])
+                x2, y2, z2 = map(int, p[22:25])
+                x = x2 - x1 + 1
+                y = y2 - y1 + 1
+                z = z2 - z1 + 1
+                # Get the layer that the block belongs to
+                layer = sleigh.layers.get(z1, None)
+                if layer is None:
+                    layer = Layer(z=z1)
+                    sleigh.layers[z1] = layer
+                # Create the present and add it to the layer
+                present = Present(pid, x, y, z, (x1, y1, z1))
+                layer.presents[(x1, y1, z1)] = present
+                count += 1
+        logger.info("Loaded {} presents into sleigh".format(count))
+        return sleigh
+
+    def add_layer(self, layer):
+        # Add a layer to the layer hash and update the max_z of the Sleigh
+        self.layers[layer.z] = layer
+        self.max_z = layer.max_z
 
     def check_count(self):
         # Check that there are a million presents
@@ -371,12 +373,12 @@ class Sleigh(object):
         # Don't check in layer collisions because it's too slow at the moment
         return self.check_count() and self.check_presents()
 
-    def output_presents(self):
+    def output_presents(self, descending=True):
         """
         Output the contents of the sleigh into a submission file
         """
         all_presents = itertools.chain.from_iterable(l.presents.values() for l in self.layers.values())
-        all_presents = sorted(all_presents, key=lambda x: x.pid, reverse=True)
+        all_presents = sorted(all_presents, key=lambda x: x.pid, reverse=descending)
         for p in all_presents:
             vertices = p.vertices
             yield [p.pid] + vertices
