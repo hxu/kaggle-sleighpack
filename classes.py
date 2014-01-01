@@ -4,6 +4,7 @@ Classes for Sleigh packing problem.
 import csv
 import itertools
 import collections
+import math
 
 
 MAX_X = 1000
@@ -289,7 +290,33 @@ class Sleigh(object):
         self.max_z = layer.max_z
 
     def score(self):
-        pass
+        # Get a list of the presents from top to bottom
+        logger.info("Scoring the Sleigh")
+        logger.info("Building list of presents")
+        presents_by_z = {}
+        all_presents = itertools.chain.from_iterable(l.presents.values() for l in self.layers.values())
+        for p in all_presents:
+            if p.zmax not in presents_by_z:
+                presents_by_z[p.zmax] = set()
+            presents_by_z[p.zmax].add(p.pid)
+
+        # Now go from top to bottom, counting each of the presents along the way
+        # This is to get the order term of the metric
+        logger.info("Scanning list to computer the order term")
+        order_term = 0
+        n_presents = 0
+        for z in sorted(presents_by_z.keys(), reverse=True):
+            current_presents = list(presents_by_z[z])
+            current_presents.sort()
+            for i in xrange(len(current_presents)):
+                n_presents += 1
+                order_term += math.fabs(n_presents - current_presents[i])
+
+        # Finally, calculate the metric
+        height_term = max(presents_by_z.keys())
+        metric = 2 * height_term + order_term
+        print '{} = 2 * height term: {} + order term: {}'.format(metric, height_term, order_term)
+        return metric
 
     def check_count(self):
         # Check that there are a million presents
@@ -314,6 +341,8 @@ class Sleigh(object):
         return True
 
     def check_collisions(self):
+        # This needs to be improved since it assumes that presents don't exceed the bounds of the Layer
+        # Can use the method in MetricCalculation
         logger.info("Checking for collisions")
         sorted_layers = sorted(self.layers.values(), key=lambda l: l.z)
         a, b = itertools.tee(sorted_layers)

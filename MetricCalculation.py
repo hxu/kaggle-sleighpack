@@ -257,6 +257,7 @@ if __name__ == "__main__":
     orderTerm = 0
     presentsSeenSoFar = 0
     currentPresentsSet = set()
+    import ipdb; ipdb.set_trace()
     for zheight in sorted(orderedPresents.iterkeys(), reverse=True):
         presentsInCrossSection = list(orderedPresents[zheight])
         presentsInCrossSection.sort()
@@ -271,3 +272,14 @@ if __name__ == "__main__":
     print 'Metric = ' + str(metric)
 
     print '\nTotal clock time = ' + str(time.clock() - start)
+
+    # orderedPresents is a dictionary with keys of z-height and values of sets
+    # The sets are the Ids of the presents that appear at that z-height.
+    # Presents are only included in the set at which they first appear
+
+    # Once we have orderedPresents, then it iterates over orderedPresents from top to bottom
+    # At each z-slice (a layer with heigh of 1), it increments the present counter, which also represents
+    # the present ID.  it then subtracts the ID of the present with the counter to get the value to add to the order term
+
+    # This script also checks for collisions as it scores, which is why it uses the currentPresentsSet
+    # This set is kind of like a rolling window of which presents occupy space within the current z-slice
