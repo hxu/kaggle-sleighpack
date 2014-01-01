@@ -342,7 +342,7 @@ class Sleigh(object):
         # Don't check in layer collisions because it's too slow at the moment
         return self.check_count() and self.check_presents()
 
-    def write(self):
+    def output_presents(self):
         """
         Output the contents of the sleigh into a submission file
         """
@@ -351,3 +351,14 @@ class Sleigh(object):
         for p in all_presents:
             vertices = p.vertices
             yield [p.pid] + vertices
+
+    def write_to_file(self, outfile):
+        logger.info("Writing output file")
+        count = 0
+        with open(outfile, 'wb') as out:
+            write = csv.writer(out)
+            write.writerow(create_header())
+            for row in self.output_presents():
+                write.writerow(row)
+                count += 1
+        logger.info("{} presents written to file".format(count))

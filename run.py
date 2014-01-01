@@ -38,12 +38,7 @@ def sample_bottom_up(infile='presents_revorder.csv', outfile='sub_bottomup_1.csv
         return sleigh
 
     if write:
-        logger.info("Writing output file")
-        with open(outfile, 'wb') as out:
-            write = csv.writer(out)
-            write.writerow(create_header())
-            for row in sleigh.write():
-                write.writerow(row)
+        sleigh.write_to_file(outfile)
     return sleigh
 
 
