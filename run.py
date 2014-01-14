@@ -4,11 +4,7 @@ Packing algorithms
 import csv
 import os
 import classes
-from classes import create_header
-import logging
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+from classes import create_header, logger
 
 
 def sample_bottom_up(infile='presents_revorder.csv', outfile='sub_bottomup_1.csv', write=True, check=True):
@@ -65,7 +61,7 @@ def sample_top_down(infile='presents_revorder.csv', outfile='sub_topdown_1.csv',
     Strategy is basically the same as bottom_up, but before closing each layer,
     align all of the presents to the top of the layer.
 
-    Actually this strategy is not quite the same, since it reads the presnt in a different order.
+    Actually this strategy is not quite the same, since it reads the present in a different order.
     Result is a slightly higher score than the benchmark
     """
     sleigh = classes.LayerSleigh()
@@ -97,3 +93,90 @@ def sample_top_down(infile='presents_revorder.csv', outfile='sub_topdown_1.csv',
     if write:
         sleigh.write_to_file(outfile)
     return sleigh
+
+
+class Packing(object):
+    sleigh_class = classes.LayerSleigh
+    layer_class = classes.Layer
+    infile = 'presents_revorder.csv'
+    outfile = 'foo.csv'
+
+    def __init__(self):
+        self.sleigh = self.sleigh_class()
+
+    def check(self):
+        if not self.sleigh.check_all():
+            logger.error('There is an error in the Sleigh')
+
+    def write(self):
+        self.sleigh.write_to_file(self.outfile)
+
+    def score(self):
+        return self.sleigh.score()
+
+    def run(self, check=True, write=True):
+        layer = self.layer_class()
+
+        presents_file = os.path.join('data', self.infile)
+        outfile = os.path.join('data', self.outfile)
+        logger.info("Reading and placing presents")
+        counter = 0
+        with open(presents_file, 'rb') as presents:
+            presents.readline()  # skip header
+            read = csv.reader(presents)
+            for row in read:
+                present = classes.Present(*row)
+                layer = self.process_present(present, layer)
+                counter += 1
+                if counter % 100000 == 0:
+                    logger.info("Placed {} presents".format(counter))
+
+            self.process_last_layer(layer)
+
+        logger.info("Finished placing presents")
+
+        if check:
+            self.check()
+
+        if write:
+            self.write()
+        return self
+
+    def process_last_layer(self, layer):
+        align_presents_to_layer_top(layer)
+        self.sleigh.add_layer(layer)
+
+    def process_present(self, present, layer):
+        if not layer.place_present(present):
+            align_presents_to_layer_top(layer)
+            self.sleigh.add_layer(layer)
+            layer = classes.Layer(z=self.sleigh.max_z + 1)
+            layer.place_present(present)
+        return layer
+
+
+class TopDownPacking(Packing):
+    sleigh_class = classes.ReverseLayerSleigh
+    layer_class = classes.Layer
+    infile = 'presents.csv'
+    outfile = 'sub_topdown_2.csv'
+
+    def process_present(self, present, layer):
+        if not layer.place_present(present):
+            # Flip the layer
+            layer.flip_layer()
+            self.sleigh.add_layer(layer)
+            layer = self.layer_class()
+            layer.place_present(present)
+        return layer
+
+    def process_last_layer(self, layer):
+        layer.flip_layer()
+        self.sleigh.add_layer(layer)
+        # Now need to shift everything up
+        diff = -1 * (self.sleigh.min_z - 1)
+        layers = self.sleigh.layers.items()
+        self.sleigh.layers.clear()
+        for z, layer in layers:
+            layer.z_shift_by_diff(diff)
+            self.sleigh.layers[layer.z] = layer

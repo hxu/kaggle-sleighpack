@@ -12,7 +12,18 @@ MAX_Y = 1000
 NUM_PRESENTS = 1000000
 import logging
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('Sleighpack')
+logger.setLevel(logging.INFO)
+log_formatter = logging.Formatter('%(asctime)s - %(module)s - %(levelname)s - %(message)s',
+                                  datefmt='%Y-%m-%d %H:%M:%S')
+# Log to console
+logstream = logging.StreamHandler()
+logstream.setLevel(logging.INFO)
+logstream.setFormatter(log_formatter)
+
+logger.addHandler(logstream)
+
+
 
 
 def create_header():
@@ -175,6 +186,10 @@ class Layer(object):
     def __repr__(self):
         return "Layer at {}".format(self.z)
 
+    @property
+    def height(self):
+        return self.max_z - self.z + 1
+
     def place_present(self, present):
         """
         - Start at (1,1,1). Pack along y=1, z=1 until full
@@ -229,6 +244,49 @@ class Layer(object):
                 self._errors.append('Present {} overlaps with present {}'.format(p1.pid, p2.pid))
                 return False
         return True
+
+    def flip_layer(self):
+        """
+        Flip the layer along the x,y plane.
+        Used for loading top down, when the z on the layer == 1
+        """
+        presents = self.presents.items()
+        self.presents.clear()
+        for coords, present in presents:
+            new_coords = (coords[0], coords[1], present.z1 - present.z - 1)
+            present.position = new_coords
+            self.presents[new_coords] = present
+
+        # update the z and the max_z
+        self.z = -1 * self.max_z
+        self.max_z = -1
+
+    def reposition_at_z(self, new_z):
+        """
+        Shifts all presents to a new z index
+        """
+        presents = self.presents.items()
+        self.presents.clear()
+        diff = new_z - self.z
+        for coords, present in presents:
+            new_coords = (coords[0], coords[1], coords[2] + diff)
+            present.position = new_coords
+            self.presents[new_coords] = present
+
+        self.max_z = self.max_z + diff
+        self.z = new_z
+
+    def z_shift_by_diff(self, diff):
+        presents = self.presents.items()
+        self.presents.clear()
+        for coords, present in presents:
+            new_coords = (coords[0], coords[1], coords[2] + diff)
+            present.position = new_coords
+            self.presents[new_coords] = present
+
+        self.max_z += diff
+        self.z += diff
+
 
 
 class LayerCursor(object):
@@ -393,3 +451,20 @@ class LayerSleigh(Sleigh):
                 write.writerow(row)
                 count += 1
         logger.info("{} presents written to file".format(count))
+
+
+class ReverseLayerSleigh(LayerSleigh):
+    """
+    Same as LayerSleigh, but stacks layers into -z axis
+    """
+    def __init__(self):
+        super(ReverseLayerSleigh, self).__init__()
+        self.min_z = 0
+
+    def add_layer(self, layer):
+        # The layer currently occupies -1, layer.z
+        # Need to push it down
+        new_z = self.min_z - layer.height
+        layer.reposition_at_z(new_z)
+        self.layers[layer.z] = layer
+        self.min_z = new_z
