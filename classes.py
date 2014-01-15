@@ -24,8 +24,6 @@ logstream.setFormatter(log_formatter)
 logger.addHandler(logstream)
 
 
-
-
 def create_header():
     header = ['PresentId']
     for i in xrange(1,9):
@@ -142,6 +140,34 @@ class Present(object):
         ]
         return list_vertices
 
+    def contains_xy(self, otherPresent):
+        """
+        Checks on the x,y plane if otherPresent is fully contained in this present
+        """
+        return otherPresent.xmin >= self.xmin and otherPresent.ymin >= self.ymin and \
+               otherPresent.xmax <= self.xmax and otherPresent.ymax <= self.ymax
+
+    def overlaps_xy(self, otherPresent):
+        """
+        Checks on the x,y plane if otherPresent overlaps with this present
+        """
+        overlaps = True
+        if (self.xmax < otherPresent.xmin) or (otherPresent.xmax < self.xmin):
+            overlaps = False
+        if (self.ymax < otherPresent.ymin) or (otherPresent.ymax < self.ymin):
+            overlaps = False
+        if overlaps:
+            return True
+        return False
+
+    def rotate_xy(self):
+        """
+        Rotates the present along the z-axis.  Basically swaps x and y lengths
+        """
+        x = self.x
+        self.x = self.y
+        self.y = x
+
 
 def get_all_presents():
     """
@@ -190,6 +216,10 @@ class Layer(object):
     def height(self):
         return self.max_z - self.z + 1
 
+    @property
+    def n_presents(self):
+        return len(self.presents)
+
     def place_present(self, present):
         """
         - Start at (1,1,1). Pack along y=1, z=1 until full
@@ -235,12 +265,8 @@ class Layer(object):
         # This is really slow right now
         # Ensure that no presents overlap on the xy plane
         for p1, p2 in itertools.combinations(self.presents.values(), 2):
-            overlaps = True
-            if (p1.xmax < p2.xmin) or (p2.xmax < p1.xmin):
-                overlaps = False
-            if (p1.ymax < p2.ymin) or (p2.ymax < p1.ymin):
-                overlaps = False
-            if overlaps:
+            if p1.overlaps(p2):
+                logger.info('Present {} overlaps with present {}'.format(p1.pid, p2.pid))
                 self._errors.append('Present {} overlaps with present {}'.format(p1.pid, p2.pid))
                 return False
         return True
@@ -287,6 +313,144 @@ class Layer(object):
         self.max_z += diff
         self.z += diff
 
+
+class MaxRectsLayer(Layer):
+    """
+    Layer that places presents based on the MaxRects algorithm
+    """
+    def __init__(self):
+        super(MaxRectsLayer, self).__init__()
+        first_free_rect = Present(-1, 1000, 1000, 0)
+        self._free_rectangles = [first_free_rect]
+
+    def place_present(self, present):
+        """
+        Decide which free rectangle to pack into
+            - If no rectangle, start a new bin
+        Pack the present into the chosen rectangle
+        Split the remaining free space into two children free rectangles and add the free rectangles to the list
+        For each free rectangle, check if the placed present intersects with it
+            - If it does intersect, then split the free rectangle, and add them to the list
+        Prune the list of free rectangles (check if any free rectangles are fully contained by other free rectangles
+        """
+        logger.debug("Placing present: {}".format(present))
+        free_rect = self.choose_free_rectangle(present)
+        if free_rect is None:
+            # Layer is full
+            logger.debug("Present doesn't fit in Layer")
+            return False
+
+        # Place the present
+        logger.debug("Placing present at {}, {}".format(free_rect.position[0], free_rect.position[1]))
+        present.position = free_rect.position
+        self.presents[present.position] = present
+        if present.zmax > self.max_z:
+            self.max_z = present.zmax
+
+        if present.xmax > MAX_X or present.ymax > MAX_Y:
+            logger.warn("Present {} exceeds bounds of layer".format(present.pid))
+
+        # Iterate over the free rectangles to check for splits
+        # Keep only rectangles that do not overlap and new rectangles created from splits
+        new_rectangles = []
+        for i, rect in enumerate(self._free_rectangles):
+            if present.overlaps_xy(rect):
+                new_rectangles += self.split_rectangle(rect, present)
+            else:
+                new_rectangles.append(rect)
+
+        # Prune the rectangles
+        self._free_rectangles = self.prune_rectangles(new_rectangles)
+        return True
+
+    def choose_free_rectangle(self, present):
+        """
+        Decides which free rectangle to put the present into.  Returns the free rectangle
+        We use the bottom left rule
+        """
+        chosen_rect = None
+        best_y = 1001
+        for rect in self._free_rectangles:
+            # Place as is and see if it'll fit
+            first_y = self.place_present_in_rectangle(present, rect)
+            if first_y is not False and first_y < best_y:
+                best_y = first_y
+                chosen_rect = rect
+
+            # Rotate and place and see if it'll fit
+            present.rotate_xy()
+            second_y = self.place_present_in_rectangle(present, rect)
+            if second_y is not False and second_y < best_y:
+                best_y = second_y
+                chosen_rect = rect
+            else:
+                # Otherwise be sure to rotate the present back
+                present.rotate_xy()
+        return chosen_rect
+
+    def place_present_in_rectangle(self, present, rectangle):
+        """
+        Tries to place the present in the rectangle.
+        Returns False if it doesn't fit.  Otherwise returns the new maximum y coordinate
+        """
+        present.position = rectangle.position
+        # Check if it fits
+        if present.ymax > rectangle.xmax or present.xmax > rectangle.xmax:
+            return False
+        # If it does, return the ymax
+        return present.ymax
+
+
+    def prune_rectangles(self, rectangles):
+        """
+        Takes a list of rectangles, and returns a new list, removing rectangles that are fully encompassed by others
+        """
+        new_rects = []
+        for r1 in rectangles:
+            contained = False
+            for r2 in rectangles:
+                if r1 == r2:
+                    continue
+                if r2.contains_xy(r1):
+                    contained = True
+                    break
+            if not contained:
+                new_rects.append(r1)
+        return new_rects
+
+    def split_rectangle(self, rectangle, present):
+        """
+        Given a rectangle and a present that overlaps with the rectangle, split the rectangle into at most four new MaxRects
+        """
+        new_rects = []
+        # Check left
+        if rectangle.xmin < present.xmin < rectangle.xmax:
+            # Create new rectangle to the left
+            new_x = present.xmin - rectangle.xmin
+            new_rect = Present(-1, new_x, rectangle.y, 0, position=rectangle.position)
+            new_rects.append(new_rect)
+
+        # Check right
+        if rectangle.xmin < present.xmax < rectangle.xmax:
+            new_x = rectangle.xmax - present.xmax
+            new_x_pos = rectangle.xmax - new_x + 1
+            new_rect = Present(-1, new_x, rectangle.y, 0, position=(new_x_pos, rectangle.y1, rectangle.z1))
+            new_rects.append(new_rect)
+
+        # Check top
+        if rectangle.ymin < present.ymax < rectangle.ymax:
+            new_y = rectangle.ymax - present.ymax
+            new_y_pos = rectangle.ymax - new_y + 1
+            new_rect = Present(-1, rectangle.x, new_y, 0, position=(rectangle.x1, new_y_pos, rectangle.z1))
+            new_rects.append(new_rect)
+
+        # Check bottom
+        if rectangle.ymax > present.ymin > rectangle.ymin:
+            new_y = present.ymin - rectangle.ymin
+            new_rect = Present(-1, rectangle.x, new_y, 0, position=rectangle.position)
+            new_rects.append(new_rect)
+
+        return new_rects
 
 
 class LayerCursor(object):
@@ -387,18 +551,20 @@ class LayerSleigh(Sleigh):
         logger.info("Checking that the presents are the correct dimension and in the sleigh")
         all_presents = get_all_presents()
         sleigh_presents = itertools.chain.from_iterable([x.presents.values() for x in self.layers.values()])
+        starting_length = len(self._errors)
         for p in sleigh_presents:
             # Check that each of the presents is the right dimension
             actual_present = all_presents[p.pid]
             if p != actual_present:
                 self._errors.append('Present {} has dimensions {}, should be {}'.format(p.pid, p.dimensions, actual_present.dimensions))
-                return False
             # Check that each present is in the sleigh
             vertices = [p.x1, p.x2, p.y1, p.y2]
             if max(vertices) > MAX_Y or min(vertices) < 1:
                 self._errors.append('Present {} exceeds boundaries of sleigh'.format(p.pid))
-                return False
-        return True
+        if starting_length < len(self._errors):
+            return False
+        else:
+            return True
 
     def check_collisions(self):
         # This needs to be improved since it assumes that presents don't exceed the bounds of the Layer

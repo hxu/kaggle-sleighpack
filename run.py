@@ -100,6 +100,7 @@ class Packing(object):
     layer_class = classes.Layer
     infile = 'presents_revorder.csv'
     outfile = 'foo.csv'
+    log_at = 100000
 
     def __init__(self):
         self.sleigh = self.sleigh_class()
@@ -128,7 +129,7 @@ class Packing(object):
                 present = classes.Present(*row)
                 layer = self.process_present(present, layer)
                 counter += 1
-                if counter % 100000 == 0:
+                if counter % self.log_at == 0:
                     logger.info("Placed {} presents".format(counter))
 
             self.process_last_layer(layer)
@@ -180,3 +181,11 @@ class TopDownPacking(Packing):
         for z, layer in layers:
             layer.z_shift_by_diff(diff)
             self.sleigh.layers[layer.z] = layer
+
+
+class TopDownMaxRect(TopDownPacking):
+    sleigh_class = classes.ReverseLayerSleigh
+    layer_class = classes.MaxRectsLayer
+    infile = 'presents.csv'
+    outfile = 'sub_topdown_3.csv'
+    log_at = 10000
