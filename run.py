@@ -183,6 +183,24 @@ class TopDownPacking(Packing):
             self.sleigh.layers[layer.z] = layer
 
 
+class TopDownPackingRotateZ(TopDownPacking):
+    sleigh_class = classes.ReverseLayerSleigh
+    layer_class = classes.Layer
+    infile = 'presents.csv'
+    outfile = 'sub_topdown_5.csv'
+
+    def process_present(self, present, layer):
+        # Rotate the present so that it's z is smallest
+        present.rotate_shortest_z()
+        if not layer.place_present(present):
+            # Flip the layer
+            layer.flip_layer()
+            self.sleigh.add_layer(layer)
+            layer = self.layer_class()
+            layer.place_present(present)
+        return layer
+
+
 class TopDownMaxRect(TopDownPacking):
     sleigh_class = classes.ReverseLayerSleigh
     layer_class = classes.MaxRectsLayer

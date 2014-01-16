@@ -45,6 +45,7 @@ class Present(object):
         self.z1 = position[2]
         self.update_opposite_corner()
         self.update_extents()
+        self.dimensions = {self.x, self.y, self.z}
 
     def __repr__(self):
         return "Present #{}: {}, {}, {}".format(self.pid, self.x, self.y, self.z)
@@ -85,10 +86,6 @@ class Present(object):
         self.ymin = min(self.y1, self.y2)
         self.zmax = max(self.z1, self.z2)
         self.zmin = min(self.z1, self.z2)
-
-    @property
-    def dimensions(self):
-        return {self.x, self.y, self.z}
 
     @property
     def vertices(self):
@@ -263,7 +260,7 @@ class Layer(object):
         # This is really slow right now
         # Ensure that no presents overlap on the xy plane
         for p1, p2 in itertools.combinations(self.presents.values(), 2):
-            if p1.overlaps(p2):
+            if p1.overlaps_xy(p2):
                 logger.info('Present {} overlaps with present {}'.format(p1.pid, p2.pid))
                 self._errors.append('Present {} overlaps with present {}'.format(p1.pid, p2.pid))
                 return False
@@ -398,7 +395,6 @@ class MaxRectsLayer(Layer):
         # If it does, return the ymax
         return present.ymax
 
-
     def prune_rectangles(self, rectangles):
         """
         Takes a list of rectangles, and returns a new list, removing rectangles that are fully encompassed by others
@@ -414,6 +410,7 @@ class MaxRectsLayer(Layer):
                     break
             if not contained:
                 new_rects.append(r1)
+        logger.debug("Pruned {} rectangles".format(len(new_rects) - len(rectangles)))
         return new_rects
 
     def split_rectangle(self, rectangle, present):
@@ -540,7 +537,7 @@ class LayerSleigh(Sleigh):
         self.layers[layer.z] = layer
         self.max_z = layer.max_z
         count = len(self.layers)
-        if count % 100 == 0:
+        if (count % 100) == 0:
             logger.info("Layer # {} with {} presents added to the sleigh. New max z is {}".format(count, layer.n_presents, self.max_z))
 
     def check_count(self):
@@ -635,3 +632,6 @@ class ReverseLayerSleigh(LayerSleigh):
         layer.reposition_at_z(new_z)
         self.layers[layer.z] = layer
         self.min_z = new_z
+        count = len(self.layers)
+        if (count % 100) == 0:
+            logger.info("Layer # {} with {} presents added to the sleigh. New min z is {}".format(count, layer.n_presents, self.min_z))
