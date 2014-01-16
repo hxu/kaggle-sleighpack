@@ -539,6 +539,9 @@ class LayerSleigh(Sleigh):
         # Add a layer to the layer hash and update the max_z of the Sleigh
         self.layers[layer.z] = layer
         self.max_z = layer.max_z
+        count = len(self.layers)
+        if count % 10000 == 0:
+            logger.info("Layer # {} with {} presents added to the sleigh. New max z is {}".format(count, layer.n_presents, self.max_z))
 
     def check_count(self):
         # Check that there are a million presents
