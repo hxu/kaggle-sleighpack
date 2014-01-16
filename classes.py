@@ -43,6 +43,8 @@ class Present(object):
         self.x1 = position[0]
         self.y1 = position[1]
         self.z1 = position[2]
+        self.update_opposite_corner()
+        self.update_extents()
 
     def __repr__(self):
         return "Present #{}: {}, {}, {}".format(self.pid, self.x, self.y, self.z)
@@ -67,50 +69,26 @@ class Present(object):
         self.x1 = position[0]
         self.y1 = position[1]
         self.z1 = position[2]
+        self.update_opposite_corner()
+        self.update_extents()
 
-    @property
-    def x2(self):
-        return self.x1 + self.x - 1
+    def update_opposite_corner(self):
+        self.x2 = self.x1 + self.x - 1
+        self.y2 = self.y1 + self.y - 1
+        self.z2 = self.z1 + self.z - 1
+        self.opposite_corner = self.x2, self.y2, self.z2
 
-    @property
-    def y2(self):
-        return self.y1 + self.y - 1
-
-    @property
-    def z2(self):
-        return self.z1 + self.z - 1
-
-    @property
-    def xmax(self):
-        return max(self.x1, self.x2)
-
-    @property
-    def xmin(self):
-        return min(self.x1, self.x2)
-
-    @property
-    def ymax(self):
-        return max(self.y1, self.y2)
-
-    @property
-    def ymin(self):
-        return min(self.y1, self.y2)
-
-    @property
-    def zmax(self):
-        return max(self.z1, self.z2)
-
-    @property
-    def zmin(self):
-        return min(self.z1, self.z2)
+    def update_extents(self):
+        self.xmax = max(self.x1, self.x2)
+        self.xmin = min(self.x1, self.x2)
+        self.ymax = max(self.y1, self.y2)
+        self.ymin = min(self.y1, self.y2)
+        self.zmax = max(self.z1, self.z2)
+        self.zmin = min(self.z1, self.z2)
 
     @property
     def dimensions(self):
         return {self.x, self.y, self.z}
-
-    @property
-    def opposite_corner(self):
-        return self.x2, self.y2, self.z2
 
     @property
     def vertices(self):
@@ -167,6 +145,9 @@ class Present(object):
         x = self.x
         self.x = self.y
         self.y = x
+
+        self.update_opposite_corner()
+        self.update_extents()
 
 
 def get_all_presents():
