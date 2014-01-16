@@ -149,6 +149,23 @@ class Present(object):
         self.update_opposite_corner()
         self.update_extents()
 
+    def rotate_shortest_z(self):
+        """
+        Rotates the present so that the z dimension is the shortest
+        """
+        # One of the other dimensions is shorter than z
+        if not (self.z < self.y and self.z < self.x):
+            if self.x < self.y:
+                x = self.x
+                self.x = self.z
+                self.z = x
+            else:
+                y = self.y
+                self.y = self.z
+                self.z = y
+            self.update_opposite_corner()
+            self.update_extents()
+
 
 def get_all_presents():
     """
