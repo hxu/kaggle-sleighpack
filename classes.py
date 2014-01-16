@@ -13,7 +13,7 @@ NUM_PRESENTS = 1000000
 import logging
 
 logger = logging.getLogger('Sleighpack')
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 log_formatter = logging.Formatter('%(asctime)s - %(module)s - %(levelname)s - %(message)s',
                                   datefmt='%Y-%m-%d %H:%M:%S')
 # Log to console
@@ -390,7 +390,7 @@ class MaxRectsLayer(Layer):
         """
         present.position = rectangle.position
         # Check if it fits
-        if present.ymax > rectangle.xmax or present.xmax > rectangle.xmax:
+        if present.ymax > rectangle.ymax or present.xmax > rectangle.xmax:
             return False
         # If it does, return the ymax
         return present.ymax
@@ -400,17 +400,18 @@ class MaxRectsLayer(Layer):
         Takes a list of rectangles, and returns a new list, removing rectangles that are fully encompassed by others
         """
         new_rects = []
-        for r1 in rectangles:
+        sorted_rects = sorted(rectangles, key=lambda x: x.x1)
+        for r1 in sorted_rects:
             contained = False
-            for r2 in rectangles:
-                if r1 == r2:
+            for r2 in sorted_rects:
+                if (r1.x1, r1.y1, r1.x2, r1.y2) == (r2.x1, r2.y1, r2.x2, r2.y2):
                     continue
                 if r2.contains_xy(r1):
                     contained = True
                     break
             if not contained:
                 new_rects.append(r1)
-        logger.debug("Pruned {} rectangles".format(len(new_rects) - len(rectangles)))
+        logger.debug("Pruned {} rectangles".format(len(rectangles) - len(new_rects)))
         return new_rects
 
     def split_rectangle(self, rectangle, present):
