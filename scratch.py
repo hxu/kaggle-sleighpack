@@ -54,3 +54,9 @@ with open(presents_file, 'rb') as presents:
             present.rotate_shortest_z()
             assert min(present.x, present.y, present.z) == present.z, "After rotation, shortest dimension is not z on present {}".format(present)
             assert dims == present.dimensions, "Dimensions differ before and after rotation"
+
+import run
+a = run.TopDownMaxRect()
+a.infile = 'presents_short.csv'
+%prun a.run(check=False, write=False)
+a.run(check=False, write=False)
