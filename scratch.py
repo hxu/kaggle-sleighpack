@@ -56,7 +56,9 @@ with open(presents_file, 'rb') as presents:
             assert dims == present.dimensions, "Dimensions differ before and after rotation"
 
 import run
+import classes
 a = run.TopDownMaxRect()
 a.infile = 'presents_short.csv'
+%lprun -f classes.MaxRectsLayer.prune_rectangles a.run(check=False, write=False)
 %prun a.run(check=False, write=False)
 a.run(check=False, write=False)

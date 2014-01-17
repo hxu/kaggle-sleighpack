@@ -400,13 +400,16 @@ class MaxRectsLayer(Layer):
         Takes a list of rectangles, and returns a new list, removing rectangles that are fully encompassed by others
         """
         new_rects = []
-        sorted_rects = sorted(rectangles, key=lambda x: x.x1)
-        for r1 in sorted_rects:
+        for r1 in rectangles:
             contained = False
-            for r2 in sorted_rects:
+            for r2 in rectangles:
+                if r1.xmin > r2.xmax or r1.xmax < r2.xmin or r1.ymin > r2.ymax or r1.ymax < r2.ymin:
+                    continue
                 if (r1.x1, r1.y1, r1.x2, r1.y2) == (r2.x1, r2.y1, r2.x2, r2.y2):
                     continue
-                if r2.contains_xy(r1):
+                # Apparently faster than doing the method call
+                if (r1.xmin >= r2.xmin and r1.ymin >= r2.ymin) and \
+                        (r1.xmax <= r2.xmax and r1.ymax <= r2.ymax):
                     contained = True
                     break
             if not contained:
