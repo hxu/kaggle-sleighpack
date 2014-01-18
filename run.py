@@ -240,7 +240,7 @@ class ZMapPacking(Packing):
     sleigh_class = classes.ZMapSleigh
     infile = 'presents.csv'
     outfile = 'sub_zmap_1.csv'
-    log_at = 10
+    log_at = 100
 
     def run(self, check=True, write=True):
         presents_file = os.path.join('data', self.infile)
@@ -257,7 +257,6 @@ class ZMapPacking(Packing):
                 if counter % self.log_at == 0:
                     logger.info("Placed {} presents".format(counter))
                     logger.info("Current min z is {}".format(np.min(self.sleigh.z_map)))
-                    import ipdb; ipdb.set_trace()
 
         logger.info("Finished placing presents")
 

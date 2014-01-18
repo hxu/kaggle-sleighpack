@@ -706,22 +706,16 @@ class ZMapSleigh(Sleigh):
         """
         windows = rolling_block(available_slots, (present.y, present.x))
         # np.all is slow here for some reason when not all of the array is True
-        # all_true_windows = True != np.any(windows, axis=(2, 3))
-        all_true_windows = np.all(windows, axis=(2, 3))
-        # all_true_windows = np.zeros(windows.shape[0:2], dtype=np.bool)
-        # for i in xrange(0, windows.shape[0]):
-        #     for j in xrange(0, windows.shape[1]):
-        #         all_true_windows[i, j] = np.all(windows[i, j])
-        coords = all_true_windows.nonzero()  # Returns tuple of two arrays with row and column indices
-        if len(coords[0]) == 0:
-            # If there aren't any windows that fit, return False
-            return False
-        # coords[0] is the rows, coords[1] is the columns, from the top left
-        # So we want max(row) and min(column)
-        # And need to adjust for package y
-        selected_coords = (coords[0][-1], coords[1][0])
-        # Just place it, don't do any more complicated logic
-        return selected_coords
+        # Search until we find a window of all trues
+        # Still waayy too slow
+        # Maybe use a skyline datastructure in order to keep track of free space, so we don't have to do this search?
+        # Also, I'm somehow getting collisions
+        # this appears to search from bottom left going up, not sure why it doesn't go to the right
+        for i in sorted(range(0, windows.shape[0]), reverse=True):
+            for j in xrange(0, windows.shape[1]):
+                if np.all(windows[i, j]):
+                    return i, j
+        return False
 
     def place_present(self, present):
         # Decide which corner to start searching from
@@ -754,6 +748,11 @@ class ZMapSleigh(Sleigh):
                 self._presents[present.position] = present
                 # Update the z-map
                 self.z_map[np_position[0]:np_position[0] + present.y, np_position[1]:np_position[1] + present.x] = z_pos
+                # We also have to make sure that later presents are not placed higher than this
+                import ipdb; ipdb.set_trace()
+                lower_slots = self.z_map > z
+                if np.any(lower_slots):
+                    self.z_map[lower_slots] = z
                 break
         return present.position
 
