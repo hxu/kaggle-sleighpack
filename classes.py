@@ -5,12 +5,15 @@ import csv
 import itertools
 import collections
 import math
+import numpy as np
+from numpy.lib.stride_tricks import as_strided
 
 
 MAX_X = 1000
 MAX_Y = 1000
 NUM_PRESENTS = 1000000
 import logging
+
 
 logger = logging.getLogger('Sleighpack')
 logger.setLevel(logging.DEBUG)
@@ -26,7 +29,7 @@ logger.addHandler(logstream)
 
 def create_header():
     header = ['PresentId']
-    for i in xrange(1,9):
+    for i in xrange(1, 9):
         header += ['x' + str(i), 'y' + str(i), 'z' + str(i)]
     return header
 
@@ -35,6 +38,7 @@ class Present(object):
     """
     A Present to be packed in the sleigh
     """
+
     def __init__(self, pid, dim1, dim2, dim3, position=(1, 1, 1)):
         self.pid = int(pid)
         self.x = int(dim1)  # "X" without rotation
@@ -189,6 +193,7 @@ class Layer(object):
     Presents are aligned on the z-axis on the layer at the bottom of each Present
     and extend upwards into the Sleigh.  The Layer ends at the topmost coordinate of all Presents in the layer.
     """
+
     def __init__(self, z=1):
         # Layer starts at (1, 1, z)
         self.x = 1
@@ -313,6 +318,7 @@ class MaxRectsLayer(Layer):
     """
     Layer that places presents based on the MaxRects algorithm
     """
+
     def __init__(self):
         super(MaxRectsLayer, self).__init__()
         first_free_rect = Present(-1, 1000, 1000, 0)
@@ -392,7 +398,7 @@ class MaxRectsLayer(Layer):
         # Check if it fits
         if present.ymax > rectangle.ymax or present.xmax > rectangle.xmax:
             return False
-        # If it does, return the ymax
+            # If it does, return the ymax
         return present.ymax
 
     def prune_rectangles(self, rectangles):
@@ -407,7 +413,7 @@ class MaxRectsLayer(Layer):
                     continue
                 if (r1.x1, r1.y1, r1.x2, r1.y2) == (r2.x1, r2.y1, r2.x2, r2.y2):
                     continue
-                # Apparently faster than doing the method call
+                    # Apparently faster than doing the method call
                 if (r1.xmin >= r2.xmin and r1.ymin >= r2.ymin) and \
                         (r1.xmax <= r2.xmax and r1.ymax <= r2.ymax):
                     contained = True
@@ -456,6 +462,7 @@ class LayerCursor(object):
     """
     Cursor object for keeping track of where we are in a layer
     """
+
     def __init__(self):
         self.x = 1
         self.y = 1
@@ -494,11 +501,26 @@ class Sleigh(object):
         print '{} = 2 * height term: {} + order term: {}'.format(metric, height_term, order_term)
         return metric
 
+    def output_presents(self):
+        raise NotImplementedError("Implement in subclass")
+
+    def write_to_file(self, outfile):
+        logger.info("Writing output file")
+        count = 0
+        with open(outfile, 'wb') as out:
+            write = csv.writer(out)
+            write.writerow(create_header())
+            for row in self.output_presents():
+                write.writerow(row)
+                count += 1
+        logger.info("{} presents written to file".format(count))
+
 
 class LayerSleigh(Sleigh):
     """
     A Sleigh is a collection of Layers
     """
+
     def __init__(self):
         # Hash of layers
         # Keys are z coordinates of the layer, values are the Layer object
@@ -529,7 +551,7 @@ class LayerSleigh(Sleigh):
                 if layer is None:
                     layer = Layer(z=z1)
                     sleigh.layers[z1] = layer
-                # Create the present and add it to the layer
+                    # Create the present and add it to the layer
                 present = Present(pid, x, y, z, (x1, y1, z1))
                 layer.presents[(x1, y1, z1)] = present
                 count += 1
@@ -542,7 +564,9 @@ class LayerSleigh(Sleigh):
         self.max_z = layer.max_z
         count = len(self.layers)
         if (count % 100) == 0:
-            logger.info("Layer # {} with {} presents added to the sleigh. New max z is {}".format(count, layer.n_presents, self.max_z))
+            logger.info(
+                "Layer # {} with {} presents added to the sleigh. New max z is {}".format(count, layer.n_presents,
+                                                                                          self.max_z))
 
     def check_count(self):
         # Check that there are a million presents
@@ -558,8 +582,9 @@ class LayerSleigh(Sleigh):
             # Check that each of the presents is the right dimension
             actual_present = all_presents[p.pid]
             if p != actual_present:
-                self._errors.append('Present {} has dimensions {}, should be {}'.format(p.pid, p.dimensions, actual_present.dimensions))
-            # Check that each present is in the sleigh
+                self._errors.append(
+                    'Present {} has dimensions {}, should be {}'.format(p.pid, p.dimensions, actual_present.dimensions))
+                # Check that each present is in the sleigh
             vertices = [p.x1, p.x2, p.y1, p.y2]
             if max(vertices) > MAX_Y or min(vertices) < 1:
                 self._errors.append('Present {} exceeds boundaries of sleigh'.format(p.pid))
@@ -581,7 +606,7 @@ class LayerSleigh(Sleigh):
             if not l1.max_z < l2.z:
                 self._errors.append('Layers at {} and {} overlap'.format(l1.z, l2.z))
                 return False
-            # Check that the boxes in each layer don't overlap
+                # Check that the boxes in each layer don't overlap
             if l1.z == 1:
                 # Need to also be sure to check the first layer
                 logger.debug("Checking collisions in layer {}".format(l1))
@@ -609,22 +634,12 @@ class LayerSleigh(Sleigh):
             vertices = p.vertices
             yield [p.pid] + vertices
 
-    def write_to_file(self, outfile):
-        logger.info("Writing output file")
-        count = 0
-        with open(outfile, 'wb') as out:
-            write = csv.writer(out)
-            write.writerow(create_header())
-            for row in self.output_presents():
-                write.writerow(row)
-                count += 1
-        logger.info("{} presents written to file".format(count))
-
 
 class ReverseLayerSleigh(LayerSleigh):
     """
     Same as LayerSleigh, but stacks layers into -z axis
     """
+
     def __init__(self):
         super(ReverseLayerSleigh, self).__init__()
         self.min_z = 0
@@ -638,4 +653,112 @@ class ReverseLayerSleigh(LayerSleigh):
         self.min_z = new_z
         count = len(self.layers)
         if (count % 100) == 0:
-            logger.info("Layer # {} with {} presents added to the sleigh. New min z is {}".format(count, layer.n_presents, self.min_z))
+            logger.info(
+                "Layer # {} with {} presents added to the sleigh. New min z is {}".format(count, layer.n_presents,
+                                                                                          self.min_z))
+
+
+def rolling_block(A, block=(3, 3)):
+    """Provide a 2D block view to 2D array. No error checking made.
+    Therefore meaningful (as implemented) only for blocks strictly
+    compatible with the shape of A."""
+    # From http://stackoverflow.com/questions/5073767/how-can-i-efficiently-process-a-numpy-array-in-blocks-similar-to-matlabs-blkpro
+    # More explanation here: http://www.johnvinyard.com/blog/?p=268
+    # Adapted to have rolling windows
+    shape = (A.shape[0] - block[0] + 1, A.shape[1] - block[1] + 1) + block
+    strides = (A.strides[0], A.strides[1]) + A.strides
+    return as_strided(A, shape=shape, strides=strides)
+
+
+class ZMapSleigh(Sleigh):
+    """
+    Sleigh that doesn't use layers
+    This sleigh packs downward into -z
+    The z-map is an 1000 x 1000 numpy array that keeps track of lowest *occupied* z for that space on the x,y plane
+    """
+
+    def __init__(self):
+        self.z_map = np.zeros((MAX_X, MAX_Y), dtype=np.int32)
+        self._presents = {}  # Dict of presents, keys are coordinates, values are presents
+        self._genome = []
+        self._errors = []
+
+    def check_collisions(self):
+        for p1, p2 in itertools.combinations(self._presents.values(), 2):
+            if p1.overlaps_xy(p2):
+                logger.info('Present {} overlaps with present {}'.format(p1.pid, p2.pid))
+                self._errors.append('Present {} overlaps with present {}'.format(p1.pid, p2.pid))
+                return False
+        return True
+
+
+    def output_presents(self, descending=True):
+        all_presents = sorted(self._presents.values(), key=lambda x: x.pid, reverse=descending)
+        for p in all_presents:
+            vertices = p.vertices
+            yield [p.pid] + vertices
+
+    def search_position_bottom_left(self, present, available_slots):
+        """
+        Search for available slots from the bottom left of the slice
+        Basically sweep a window the size of present along x and then y across available_slots
+        If all of the window is true, then the present can be placed there.
+        """
+        windows = rolling_block(available_slots, (present.y, present.x))
+        # np.all is slow here for some reason when not all of the array is True
+        # all_true_windows = True != np.any(windows, axis=(2, 3))
+        all_true_windows = np.all(windows, axis=(2, 3))
+        # all_true_windows = np.zeros(windows.shape[0:2], dtype=np.bool)
+        # for i in xrange(0, windows.shape[0]):
+        #     for j in xrange(0, windows.shape[1]):
+        #         all_true_windows[i, j] = np.all(windows[i, j])
+        coords = all_true_windows.nonzero()  # Returns tuple of two arrays with row and column indices
+        if len(coords[0]) == 0:
+            # If there aren't any windows that fit, return False
+            return False
+        # coords[0] is the rows, coords[1] is the columns, from the top left
+        # So we want max(row) and min(column)
+        # And need to adjust for package y
+        selected_coords = (coords[0][-1], coords[1][0])
+        # Just place it, don't do any more complicated logic
+        return selected_coords
+
+    def place_present(self, present):
+        # Decide which corner to start searching from
+        # Decide how to rotate the package -- which dimension should be shortest?
+        # Decide how to score the placement
+        # Start from the highest z-level and search downwards to find a layer in which to place the package
+        skyline = range(np.min(self.z_map) - 1, np.max(self.z_map))
+        # Guaranteed to fit in this range, because the layer at min(self.z_map) - 1 is completely unoccupied
+        skyline.reverse()  # Reverse so goes from less negative to more negative, starts one layer below highest occupied layer
+        present_area = present.x * present.y
+        for z in skyline:
+            # True if there is nothing occupying that space in this layer
+            available_slots = self.z_map >= z
+            # If the total available area can't even fit the present, then continue onwards
+            # This is obviously an inefficient heuristic, since the area could be noncontiguous
+            if np.sum(available_slots) < present_area:
+                continue
+            # Start search from the bottom left
+            np_position = self.search_position_bottom_left(present, available_slots)
+            if np_position is False:
+                # Returns false if it doesn't fit into a continuous window
+                continue
+            else:
+                # Place the present.  Z coordinate is whatever z we're at minus height of the present
+                # Need to shift the position + 1 because numpy arrays are 0-indexed
+                # Also need to take into account that the np_position is based on top left corner
+                z_pos = z - present.z
+                position = (np_position[1] + 1, 1000 - np_position[0] + present.y - 1, z_pos)
+                present.position = position
+                self._presents[present.position] = present
+                # Update the z-map
+                self.z_map[np_position[0]:np_position[0] + present.y, np_position[1]:np_position[1] + present.x] = z_pos
+                break
+        return present.position
+
+    def reverse(self):
+        """
+        Reverses from -z to positive z axis.  Basically shifts everything upwards by the total height of the sleigh
+        """
+        pass

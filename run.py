@@ -5,6 +5,7 @@ import csv
 import os
 import classes
 from classes import create_header, logger
+import numpy as np
 
 
 def sample_bottom_up(infile='presents_revorder.csv', outfile='sub_bottomup_1.csv', write=True, check=True):
@@ -97,10 +98,8 @@ def sample_top_down(infile='presents_revorder.csv', outfile='sub_topdown_1.csv',
 
 class Packing(object):
     sleigh_class = classes.LayerSleigh
-    layer_class = classes.Layer
     infile = 'presents_revorder.csv'
     outfile = 'foo.csv'
-    log_at = 100000
 
     def __init__(self):
         self.sleigh = self.sleigh_class()
@@ -114,6 +113,11 @@ class Packing(object):
 
     def score(self):
         return self.sleigh.score()
+
+
+class LayerPacking(Packing):
+    layer_class = classes.Layer
+    log_at = 100000
 
     def run(self, check=True, write=True):
         layer = self.layer_class()
@@ -136,11 +140,11 @@ class Packing(object):
 
         logger.info("Finished placing presents")
 
-        if check:
-            self.check()
-
         if write:
             self.write()
+
+        if check:
+            self.check()
         return self
 
     def process_last_layer(self, layer):
@@ -156,7 +160,7 @@ class Packing(object):
         return layer
 
 
-class TopDownPacking(Packing):
+class TopDownLayerPacking(LayerPacking):
     sleigh_class = classes.ReverseLayerSleigh
     layer_class = classes.Layer
     infile = 'presents.csv'
@@ -183,7 +187,7 @@ class TopDownPacking(Packing):
             self.sleigh.layers[layer.z] = layer
 
 
-class TopDownPackingRotateZ(TopDownPacking):
+class TopDownPackingRotateZ(TopDownLayerPacking):
     sleigh_class = classes.ReverseLayerSleigh
     layer_class = classes.Layer
     infile = 'presents.csv'
@@ -201,7 +205,8 @@ class TopDownPackingRotateZ(TopDownPacking):
         return layer
 
 
-class TopDownMaxRect(TopDownPacking):
+class TopDownMaxRect(TopDownLayerPacking):
+    # Needs about 3G of ram because all of the MaxRects are not destroyed when the layer is added to the sleigh
     sleigh_class = classes.ReverseLayerSleigh
     layer_class = classes.MaxRectsLayer
     infile = 'presents.csv'
@@ -209,7 +214,7 @@ class TopDownMaxRect(TopDownPacking):
     log_at = 10000
 
 
-class TopDownMaxRectShortestZ(TopDownPacking):
+class TopDownMaxRectShortestZ(TopDownLayerPacking):
     """
     TopDownMaxRect, but ensuring that the shortest dimension is the z-dimension before placing into the layer
     """
@@ -229,3 +234,37 @@ class TopDownMaxRectShortestZ(TopDownPacking):
             layer = self.layer_class()
             layer.place_present(present)
         return layer
+
+
+class ZMapPacking(Packing):
+    sleigh_class = classes.ZMapSleigh
+    infile = 'presents.csv'
+    outfile = 'sub_zmap_1.csv'
+    log_at = 10
+
+    def run(self, check=True, write=True):
+        presents_file = os.path.join('data', self.infile)
+        outfile = os.path.join('data', self.outfile)
+        logger.info("Reading and placing presents")
+        counter = 0
+        with open(presents_file, 'rb') as presents:
+            presents.readline()  # skip header
+            read = csv.reader(presents)
+            for row in read:
+                present = classes.Present(*row)
+                position = self.sleigh.place_present(present)
+                counter += 1
+                if counter % self.log_at == 0:
+                    logger.info("Placed {} presents".format(counter))
+                    logger.info("Current min z is {}".format(np.min(self.sleigh.z_map)))
+                    import ipdb; ipdb.set_trace()
+
+        logger.info("Finished placing presents")
+
+        if write:
+            self.write()
+
+        if check:
+            self.check()
+
+        return self

@@ -62,3 +62,10 @@ a.infile = 'presents_short.csv'
 %lprun -f classes.MaxRectsLayer.prune_rectangles a.run(check=False, write=False)
 %prun a.run(check=False, write=False)
 a.run(check=False, write=False)
+
+import run
+import ipdb
+a = run.ZMapPacking()
+a.infile = 'presents_short.csv'
+a.run(check=False, write=False)
+ipdb.run('a.run()')
