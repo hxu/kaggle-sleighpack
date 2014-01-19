@@ -59,6 +59,8 @@ import run
 import classes
 a = run.TopDownMaxRect()
 a.infile = 'presents_short.csv'
+%timeit -n1 a.run(check=False, write=False)
+
 %lprun -f classes.MaxRectsLayer.prune_rectangles a.run(check=False, write=False)
 %prun a.run(check=False, write=False)
 a.run(check=False, write=False)
